@@ -7,7 +7,7 @@ source('.project.settings.R')
 
 dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
   # filter(has.both) %>% 
-  filter(is.nonamb) %>%
+  filter(!is.nonamb) %>%
   droplevels()
 
 stance.labs. <- c(
@@ -22,18 +22,31 @@ dt. %<>%
           labels = stance.labs.,
           levels = params.,
           )) %>% 
-  filter( !is.na(paramcd ) ) %>% 
-  left_join(.dd('steps') %>% select(study, sjid, avisitn, amb))
+  filter( !is.na(paramcd ) )
 
-# selection ---------------------------------------------------------------
+  # # group_by(sjid, study, avisitn, paramcd) %>% 
+  # # filter(n()>1)
+  # # filter(sjid == 4218) %>% .p
+  # # .ug %>% slice(1283)
+  # left_join(
+  #   .dd('steps') %>% select(study, sjid, avisitn, amb) %>% 
+  #     filter(!is.na(amb)) %>%
+  #     filter(study %in% c('CRCSCA','UNIFAI')) %>%
+  #     group_by(sjid, study, avisitn) %>%
+  #     unique 
+  #   # %>% 
+  #   #   filter(n()>1) %>% .ug %>% select(study) %>% .tab
+  #   )
+
+  
+# floor values            ----------------------------------------------
 
 dt.tmp <- dt. %>%
+  # filter(can.stand, is.nonamb) %>%
+  # filter(!is.nonamb) %>%
+  # filter(is.30ol) %>% 
   mutate(aval = floor(aval)) %>%
   .gs %>% 
-  # filter(avisitx != 0 & (avisitn == min(avisitn)))
-  filter(avisitn == min(avisitn)) %>%
-  # filter   (study != 'FACOMS') %>%
-  # group_by(sjid) %>% filter(adt == min(adt)) %>%
   .ug
 
 # graph ----------------------------------------------------------------
@@ -69,7 +82,7 @@ dt.tmp %>%
   geom_bar(color = 'black') +
   scale_fill_manual(values = green_grey_palette) +
   facet_wrap(~study, scales = "free_y", ncol = 2) +
-  theme(base_size = 14)+
+  # theme(base_size = 14)+
   scale_x_continuous(
     breaks = x_map$xpos,
     labels = levels(dt.tmp$paramcd)
@@ -83,9 +96,25 @@ dt.tmp %>%
   ) +
   guides(fill = guide_legend(nrow = 1, byrow = TRUE))+
   labs(
-    fill = "Result (4 = Unable to Stand)",
+    fill = "Result",
     x = "Stance Position",
     y = NULL
-  )
+  )+
+  .theme()
 
-# .sp(l = 'F', i = 1)
+# .sp(ti = 'ALL', l = 'F', i = 1)
+
+dt.tmp %>% 
+  # filter(paramcd == 'feet together,\neyes closed') %>%
+  # filter(paramcd == 'in tandem') %>%
+  filter(paramcd == 'feet apart') %>%
+  select(study, aval) %>% 
+  group_by(study) %>% 
+  mutate(N=n()) %>% 
+  filter(!aval<4) %>% 
+  group_by(study, N) %>% 
+  summarise(n=n()) %>% 
+  mutate(n/N)
+
+
+

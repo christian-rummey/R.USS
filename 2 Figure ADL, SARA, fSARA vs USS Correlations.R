@@ -6,8 +6,10 @@ rm(list = ls())
 source('.project.settings.R')
 
 dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
-  # filter(has.both) %>% 
-  # filter(is.nonamb) %>%
+  # filter(has.both) %>%
+  # filter(!is.nonamb) %>%
+  # filter(!is.preataxic) %>% 
+  mutate( status = ifelse(is.preataxic, 'preataxic', ifelse(is.nonamb, 'non-ambualtory', 'ambulatory' ))) %>% 
   droplevels()
 
 params. <- c('ADL','SARA','FARS.E','fSARA')
@@ -47,8 +49,8 @@ dt. %<>%
 # SARA, fSARA //SARA.ax/app vs USS ---------------------------------------------
 
 dt.tmp <- dt. %>% 
+  filter(!is.nonamb) %>% 
   gather( paramcd, aval, ADL, SARA, fSARA ) %>% 
-  filter(has.both) %>%
   .gs %>% filter(avisitn == min(avisitn)) %>% ungroup %>% 
   filter(!is.na(aval)) %>% 
   filter( paramcd %in% c('ADL','SARA','fSARA')) %>%
@@ -57,19 +59,26 @@ dt.tmp <- dt. %>%
 dt.tmp %>% 
   ggplot()+geom_point()+
   aes ( y = USS, x = aval )+
-  aes ( color = is.nonamb )+ggsci::scale_color_d3()+
-  facet_wrap( ~paste(study, paramcd, sep=', '), scales = 'free_x', ncol = 3 )+
+  aes ( color = status )+ggsci::scale_color_d3()+
+  # facet_wrap( ~paste(study, paramcd, sep=', '), scales = 'free_x', ncol = 3 )+
+  facet_grid( study~paramcd, scales = 'free_x')+
+  aes(alpha = is.30ol)+scale_alpha_manual(values = c(0.55, 1))+
   ggpmisc::stat_correlation(
     aes(label = paste(after_stat(rr.label))),
         size =  10 / .pt,
         family = theme_get()$text$family, 
+    alpha = NA,
     data = dt.tmp %>% 
-      filter(!is.nonamb)
+      # filter( status == 'ambulatory') %>% 
+      droplevels()
       )+
-  geom_smooth(method = lm, se =F)+
+  geom_smooth(method = lm, se =F,     alpha = NA)+
   coord_cartesian(ylim = c(0, 36))+
   labs(color = 'Ambulation (by E7)', y = "Upright Stability Score")+
   .leg('none')
 
-# .sp( ti = 'USS vs ADL, SARA, f-SARA', l = "F", i = 1)
+# .sp( ti = 'Figure 2: USS vs ADL, SARA, f-SARA', l = "F", i = 1)
+
+
+
 

@@ -6,8 +6,8 @@ rm(list = ls())
 source('.project.settings.R')
 
 dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
-  # filter(has.both) %>% 
-  # filter(is.nonamb) %>%
+  filter(has.both) %>%
+  filter(!is.nonamb) %>%
   droplevels()
 
 params. <- c('ADL','SARA','FARS.E','fSARA')
@@ -68,7 +68,42 @@ dt.tmp %>%
       )+
   geom_smooth(method = lm, se =F)+
   coord_cartesian(ylim = c(0, 36))+
-  labs(color = 'Ambulation (by E7)', y = "Upright Stability Score")+
+  labs(color = 'Ambulation (by E7)', y = "Activities of Daily Living")+
   .leg('none')
 
 # .sp( ti = 'ADL vs USS, SARA, f-SARA', l = "F", i = 1)
+
+require(ggh4x)
+
+
+library(ggplot2)
+library(ggh4x)
+library(grid)
+library(gtable)
+
+# Your original plot
+p <- dt.tmp  %>%
+  ggplot( aes(x = aval, y = ADL, color = is.nonamb)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  ggsci::scale_color_d3() +
+  ggpmisc::stat_correlation(
+    aes(label = paste(after_stat(rr.label))),
+    size =  10 / .pt,
+    family = theme_get()$text$family, 
+    data = dt.tmp %>% 
+      filter(!is.nonamb)
+  )+
+  facet_wrap2(~paste( study,paramcd,  sep = ', '), 
+              strip.position = "bottom", 
+              scales = "free_x", ncol = 3) +
+  theme(strip.placement = "outside") +  # This helps positioning
+  labs(color = 'Ambulatory (by E7)', y = "Activities of Daily Living", x = NULL)+
+  .leg('none')
+
+# Convert to grob
+g <- ggplotGrob(p)
+
+# Examine gtable layout (manually!)
+grid::grid.newpage()
+grid::grid.draw(g)

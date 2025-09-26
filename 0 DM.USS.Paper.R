@@ -7,11 +7,13 @@ source('.project.settings.R')
 
 scales.list <- c('mFARS'   ,'SARA'      , 'fSARA',
                  'FARS.E'  ,
-                 # 'SARA.ax'   ,
-                 # 'FARS.BC' ,'SARA.ki'   ,
+                 'SARA.ax'   ,
+                 # 'FARS.BC' ,
+                 'SARA.ki'   ,
+                 'SARA.ku'   ,
                  # 'FARS.Am' ,#'s4.speech' ,
                  'ADL',
-                 # 'ADL.upper','ADL.lower','ADL.bulbar','ADL.other',
+                 'ADL.upper','ADL.lower','ADL.bulbar','ADL.other',
                  .l.sara,
                  .l.fsara[c(1,2,4)],
                  .l.adl,
@@ -51,15 +53,8 @@ dt. <- bind_rows(
   select( -age, -time.)
 
 dt. %<>% 
-  select(- avisit ) %>% 
+  select( -avisit ) %>% 
   filter( adt >= '2024-03-01' | study == 'UNIFAI')
-
-dt. %<>% 
-  filter( !(sjid == 'JH115' & paramcd %in% c(.l.FARS.E, 'FARS.E','USS') & avisitn == 0) ) %>%
-  mutate( avisitn = ifelse( sjid == 'JH115', 0, avisitn ))
-# %>% 
-#   filter((sjid == 'JH115' & avisitn <= 1)) %>% 
-#   spread(paramcd, aval)
 
 # add age/dur--------------------------------------------------------------
 
@@ -131,6 +126,9 @@ dt. %>%
   filter(age == min(age)) %>% 
   group_by(sjid) %>% filter(n()>1)
 
+dt. %<>% 
+  filter( !( sjid == 'JH115' & avisitn == 1 ) )
+
 # spread and add fds / replacement ----------------------------------------
 
 dt. %<>% 
@@ -141,29 +139,36 @@ dt. %<>%
       filter(study %in% c('CRCSCA','UNIFAI')) %>% 
       select(study, sjid, avisitn, fds) %>% 
       filter(!is.na(fds)) %>% 
-      .gsv %>% filter(n()>1) %>%
-      slice(1) %>% 
+      # .gsv %>% filter(n()>1) %>%
+      # slice(1) %>% 
       unique
   ) %>% 
   mutate( fds = ifelse( is.na(fds), fane7, fds ) ) %>%
   # filter( is.na(fds) ) %>% 
   droplevels
 
-# label missing stuff -----------------------------------------------------
+# select whom to analyze --------------------------------------------------
 
 dt. %<>% 
-  mutate( 
-    total   = rowSums(.[c('FARS.E','fSARA','SARA','ADL')]),
-    total.c = count(.[c('FARS.E','fSARA','SARA','ADL')])
-    ) %>% 
-  mutate(is.preataxic = ifelse(total == 0, T, F)) %>%
-  select(-total, -total.c) %>% 
+  filter( !is.na(FARS.E) ) %>% 
+  filter( !is.na(SARA)   )
+
+# label missing stuff -----------------------------------------------------
+  # mutate( 
+  #   # total.c = count(.[c('FARS.E','fSARA','SARA','ADL')]),
+  #   total   = rowSums(.[c('FARS.E','fSARA','SARA','ADL')], na.rm=T)
+  #   ) %>% 
+  # filter( SARA <= 3 ) %>% arrange(SARA) %>% print ( n = 50)
   # filter(is.preataxic) %>% select(ADL, SARA, fSARA, FARS.E)
-  
-  mutate( has.USS  = !is.na(FARS.E) ) %>% 
-  mutate( has.SARA = !is.na(SARA)   ) %>% 
-  mutate( has.both = !is.na(SARA) & !is.na(FARS.E) ) %>% 
-  mutate( is.nonamb   = ifelse(fane7<5, F, T) ) %>% 
+
+dt. %<>% 
+  mutate( is.preataxic = ifelse(FARS.E == 0 & SARA == 0, T, F)) %>%
+  # mutate( has.USS  = !is.na(FARS.E) ) %>% 
+  # mutate( has.SARA = !is.na(SARA)   ) %>% 
+  # mutate( has.both = !is.na(SARA) & !is.na(FARS.E) ) %>% 
+  mutate( is.nonamb  = ifelse(fane7  >= 5, T, F) ) %>%
+  mutate( can.stand  = ifelse(fane2a  < 4, T, F) ) %>%
+  mutate( is.30ol    = ifelse(FARS.E < 31, T, F) ) %>% 
   gather( paramcd, aval, scales$paramcd) %>% 
   filter( !is.na(aval))
 
@@ -172,11 +177,23 @@ dt. %<>%
   mutate  ( avisitx = avisitn - min(avisitn) ) %>% 
   select ( study, sjid, avisitn, avisitx, paramcd, aval, everything() )
 
-# write -------------------------------------------------------------------
+# status ------------------------------------------------------------------
 
-dt. %>% 
-  filter(has.USS) %>% 
-  filter(is.na(fds))
+dt. %<>% 
+  mutate( status = ifelse(is.preataxic, 'preataxic', ifelse(is.nonamb, 'non-ambualtory', 'ambulatory' )))
+
+dt. %<>% 
+  filter( avisitx == 0 )
+
+dt.$sjid %>% unique %>% length()
+
+
+# fixstuff ----------------------------------------------------------------
+
+dt. %<>% 
+  mutate(fds = ifelse( fds == 45, 4.5, fds)) %>% 
+  mutate(fds = ifelse( fds == 25, 2.5, fds))
+# write -------------------------------------------------------------------
 
 dt. %>% 
   write_rds('DATA derived/dt.all.visits.rds')

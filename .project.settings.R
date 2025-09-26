@@ -2,7 +2,7 @@
 .pt <- 2.845276
 
 theme_set(
-  theme_minimal(base_size = 16) %+replace%
+  theme_minimal(base_size = 14) %+replace%
     theme(
       legend.position  = "top",
       legend.box      = "horizontal",
