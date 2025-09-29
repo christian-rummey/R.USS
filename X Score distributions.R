@@ -69,11 +69,13 @@ dt.tmp %>%
   # left_join(x_map, by = "paramcd") %>%
   .gs %>%
   
-  ggplot(aes(x = aval, fill = study)) +
+  # ggplot(aes(x = aval, fill = study)) +
+  # facet_wrap(paramcd~., scales = "free", ncol = 2) +
+  ggplot(aes(x = aval, fill = paramcd)) +
+  facet_wrap(study~., scales = "free", ncol = 2) +
   geom_density(alpha = .5) +
   # geom_histogram() +
   scale_fill_manual()+.sfbs1 +
-  facet_wrap(paramcd~., scales = "free", ncol = 2) +
   # theme(base_size = 14)+
   # scale_x_continuous(
   #   breaks = x_map$xpos,
@@ -94,19 +96,4 @@ dt.tmp %>%
   # )+
   .theme()
 
-# .sp(ti = 'ALL', l = 'F', i = 1)
 
-# dt.tmp %>% 
-#   # filter(paramcd == 'feet together,\neyes closed') %>%
-#   # filter(paramcd == 'in tandem') %>%
-#   filter(paramcd == 'feet apart') %>%
-#   select(study, aval) %>% 
-#   group_by(study) %>% 
-#   mutate(N=n()) %>% 
-#   filter(!aval<4) %>% 
-#   group_by(study, N) %>% 
-#   summarise(n=n()) %>% 
-#   mutate(n/N)
-# 
-# 
-# 
