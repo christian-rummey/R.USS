@@ -62,38 +62,24 @@ green_grey_palette <- c(
 
 
 dt.tmp %>%
-  filter(!is.na(subtype)) %>% 
-  # filter(subtype == 'SCA27B') %>% 
-  # mutate(study = ifelse(subtype == 'SCA27B', paste(study, subtype), study)) %>% 
-  # filter(paramcd == 'USS') %>% 
-  # left_join(x_map, by = "paramcd") %>%
-  .gs %>%
-  
-  # ggplot(aes(x = aval, fill = study)) +
-  # facet_wrap(paramcd~., scales = "free", ncol = 2) +
+  filter(!is.na(subtype)) %>% .gs %>% 
   ggplot(aes(x = aval, fill = paramcd)) +
   facet_wrap(study~., scales = "free", ncol = 2) +
   geom_density(alpha = .5) +
-  # geom_histogram() +
-  scale_fill_manual()+.sfbs1 +
-  # theme(base_size = 14)+
-  # scale_x_continuous(
-  #   breaks = x_map$xpos,
-  #   labels = levels(dt.tmp$paramcd)
-  # ) +
-  # geom_hline(
-  #   data = lines.df,
-  #   aes(yintercept = yintercept),
-  #   linetype = "dashed",
-  #   color = "darkred",
-  #   size = 1
-  # ) +
-  # guides(fill = guide_legend(nrow = 1, byrow = TRUE))+
-  # labs(
-  #   fill = "Result",
-  #   x = "Stance Position",
-  #   y = NULL
-  # )+
+  .sfbs1 +
+  .theme()
+
+
+dt.tmp %>%
+  filter(subtype %in% levels(factor(dt.tmp$subtype))[c(1,2,3,4,5,6,8,9,10,11)]) %>% 
+  filter(paramcd %in% c('SARA','FARS.E')) %>% 
+  filter(!is.na(subtype)) %>% .gs %>%
+  
+  ggplot() +geom_density(alpha = .5) +
+  .sfbs1 +
+  aes(x = aval, fill = paramcd)+
+  facet_wrap(~subtype) +
+  # .sfbs1 +
   .theme()
 
 

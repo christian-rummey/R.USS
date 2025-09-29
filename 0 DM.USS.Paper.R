@@ -214,7 +214,9 @@ dt. <- dt. %>%
     can.stand = (fane2a < 4),
 
     # Mild USS score: Less than 31 points (out of possible range)
-    is.30ol = (FARS.E < 31)
+    is.30ol = (FARS.E < 31),
+    is.canstand = (fane2a<4), 
+    
   ) %>%
   # Convert back to long format for analysis
   gather(paramcd, aval, all_of(scales$paramcd)) %>%

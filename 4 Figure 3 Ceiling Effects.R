@@ -4,8 +4,7 @@ source('.project.settings.R')
 
 dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
   # filter(!is.preataxic) %>% 
-  # filter(has.both) %>%
-  # filter(!is.nonamb) %>%
+  filter(!is.nonamb) %>%
   mutate( status = ifelse(is.preataxic, 'preataxic', ifelse(is.nonamb, 'non-ambualtory', 'ambulatory' ))) %>% 
   droplevels()
 
@@ -33,8 +32,8 @@ dt. %<>%
 # . -----------------------------------------------------------------------
 
 dt.cum <- dt. %>%
-  filter(dur<10) %>%
-  filter(status == 'ambulatory') %>%
+  # filter(dur<10) %>%
+  # filter(status == 'ambulatory') %>%
   # filter(is.preataxic) %>% 
   group_by(sjid, paramcd) %>% filter(avisitn == min(avisitn)) %>% ungroup %>% 
   filter( paramcd %in% c('SARA','USS','fSARA', 'ADL') ) %>% 
@@ -67,11 +66,11 @@ dt.cum %>%
   aes(y = pct_cum)+
   facet_wrap(~paramcd, ncol = 2, scales = 'free_x')+
   guides(color = guide_legend(nrow = 1))+
-  .theme(base_size = 14)+.leg('none')+
-  labs(color = NULL, y= "Cumulative Proportions of Patients", x = 'Score')
+  .theme(base_size = 14)+#.leg('none')+
+  labs(y= "Cumulative Proportions of Patients", x = 'Score', color = 'Genotype')
 
 # .sp( ti = 'Figure 3 - ADL vs USS, SARA, f-SARA', l = "F", i = 1)
-# .sp( ti = 'Figure 3 - ADL vs USS, SARA, f-SARA')
+# .sp( ti = 'Figure 3 - ADL vs USS, SARA, f-SARA (amb only)')
 
 # . -----------------------------------------------------------------------
 

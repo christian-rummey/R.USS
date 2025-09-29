@@ -1,34 +1,35 @@
-# ==============================================================================
-# USS CORRELATION ANALYSIS - ADL, SARA, fSARA vs USS
-# ==============================================================================
+# -----------------------------------------------------------------------
+#
+# USS Correlation Analysis - ADL, SARA, fSARA vs USS
+#
 # Purpose: Generate correlation plots between Upright Stability Score (USS) and
 #          other clinical assessment scales (ADL, SARA, fSARA)
-# Output:  Combined correlation plot showing all three scale relationships
-# ==============================================================================
+# Output:  Combined correlation plot showing all scale relationships
+#
+# -----------------------------------------------------------------------
 
-# SETUP AND CONFIGURATION =====================================================
+# Setup and configuration -----------------------------------------------------
 
 # Clear environment and load project settings
 rm(list = ls())
 source('.project.settings.R')
 
-# Required packages (ensure these are loaded via .project.settings.R)
-# - tidyverse (for data manipulation)
-# - magrittr (for pipe operators)
-# - ggplot2 (for plotting)
-# - ggpmisc (for correlation statistics)
-# - ggsci (for color palettes)
-# - ggExtra (for marginal plots)
+library(patchwork)  # for combining plots
+library(ggside)     # for marginal densities
 
-# CONFIGURATION
+# Configuration
 # Define clinical scales and their display labels
-CLINICAL_SCALES <- c('ADL', 'SARA', 'FARS.E', 'fSARA')
-SCALE_LABELS <- c('ADL', 'SARA', 'USS', 'fSARA')
+CLINICAL_SCALES <- c('ADL', 'SARA', 'SARA.ax', 'SARA.ki', 'FARS.E', 'fSARA')
+SCALE_LABELS <- c('ADL', 'SARA', 'SARA.axial', 'SARA.appendicular', 'USS', 'fSARA')
+
+# Optional parameters to control which plots to include
+include_SARA_axial <- TRUE          # Include SARA.axial plot
+include_SARA_appendicular <- TRUE   # Include SARA.appendicular plot
 
 # USS plot limits (based on scale range)
 USS_YLIM <- c(0, 36)
 
-# DATA LOADING AND PREPROCESSING ==============================================
+# Data loading and preprocessing ---------------------------------------------
 
 # Load preprocessed clinical data
 dt_raw <- readRDS('DATA derived/dt.all.visits.rds') %>%
@@ -49,7 +50,7 @@ dt_processed <- dt_raw %>%
                          labels = SCALE_LABELS)) %>%
   filter(!is.na(paramcd))
 
-# DATA QUALITY CHECKS ========================================================
+# DATA QUALITY CHECKS -------------------------------------
 
 # Check data availability by study and visit
 data_summary <- dt_processed %>%
@@ -64,7 +65,7 @@ data_summary <- dt_processed %>%
 print("Data availability by study and visit:")
 print(data_summary)
 
-# PREPARE ANALYSIS DATASET ===================================================
+# Prepare analysis dataset ---------------------------------------------=====
 
 # Convert to wide format for correlation analysis
 dt_wide <- dt_processed %>%
@@ -75,23 +76,34 @@ dt_wide <- dt_processed %>%
 # Focus on baseline visits and ambulatory patients
 dt_correlation <- dt_wide %>%
   filter(!is.nonamb) %>%
-  # Convert back to long format for the three scales of interest
-  gather(paramcd, aval, ADL, SARA, fSARA) %>%
+  # Convert back to long format for the scales of interest
+  gather(paramcd, aval, ADL, SARA, SARA.axial, SARA.appendicular, fSARA) %>%
   # Use baseline visits only
   group_by(sjid) %>%
   filter(avisitn == min(avisitn)) %>%
   ungroup() %>%
   # Remove missing values
   filter(!is.na(aval), !is.na(USS)) %>%
-  # Ensure scale order for plotting
-  filter(paramcd %in% c('ADL', 'SARA', 'fSARA')) %>%
-  mutate(paramcd = factor(paramcd, levels = c('ADL', 'SARA', 'fSARA')))
+  # Filter scales based on inclusion settings
+  filter(paramcd %in% {
+    scales_to_include <- c('SARA', 'fSARA', 'ADL')
+    if(include_SARA_axial) scales_to_include <- c(scales_to_include, 'SARA.axial')
+    if(include_SARA_appendicular) scales_to_include <- c(scales_to_include, 'SARA.appendicular')
+    scales_to_include
+  }) %>%
+  mutate(paramcd = factor(paramcd, levels = {
+    factor_levels <- c('SARA')
+    if(include_SARA_axial) factor_levels <- c(factor_levels, 'SARA.axial')
+    if(include_SARA_appendicular) factor_levels <- c(factor_levels, 'SARA.appendicular')
+    factor_levels <- c(factor_levels, 'fSARA', 'ADL')
+    factor_levels
+  }))
 
 # Exclude preataxic patients from correlation analysis (optional)
 dt_plot <- dt_correlation %>%
   filter(!is.preataxic)
 
-# CORRELATION PLOTTING FUNCTIONS ==============================================
+# Correlation plotting functions ---------------------------------------------
 
 #' Create correlation plot for a single clinical scale vs USS
 #' @param data Dataset containing USS, scale scores, and study information
@@ -124,65 +136,230 @@ create_single_correlation_plot <- function(data, scale_name) {
     labs(
       x = scale_name,
       y = "Upright Stability Score (USS)",
-      color = "Study",
+      color = "study",
       title = paste(scale_name, "vs USS Correlation")
     ) +
     # Apply custom theme (assuming .leg() is defined in project settings)
-    .leg('lr')
+    .leg('lr')+
+    .theme()
 
   return(p)
 }
 
-# GENERATE INDIVIDUAL CORRELATION PLOTS ======================================
+# Generate individual correlation plots ======================================
 
 # Create individual plots for each scale
 plot_ADL <- create_single_correlation_plot(dt_plot, "ADL")
 plot_SARA <- create_single_correlation_plot(dt_plot, "SARA")
+if(include_SARA_axial) {
+  plot_SARA.ax <- create_single_correlation_plot(dt_plot, "SARA.axial")
+}
+if(include_SARA_appendicular) {
+  plot_SARA.ap <- create_single_correlation_plot(dt_plot, "SARA.appendicular")
+}
 plot_fSARA <- create_single_correlation_plot(dt_plot, "fSARA")
 
-# Display individual plots (for verification)
-print("Individual correlation plots:")
-print(plot_ADL)
-print(plot_SARA)
-print(plot_fSARA)
+# # Display individual plots (for verification)
+# print("Individual correlation plots:")
+# print(plot_ADL)
+# print(plot_SARA)
+# print(plot_fSARA)
 
-# CREATE FACETED PLOT ========================================================
+# Create combined plot ---------------------------------------------=========
 
 # Optional parameter to add marginal density plots
 add_marginal_densities <- TRUE
 
-# Create faceted plot: SARA and fSARA in first row, ADL in second row
-faceted_plot <- dt_plot %>%
-  ggplot(aes(x = aval, y = USS, color = study)) +
+# Create individual plots for each scale with side densities
+plot_SARA_clean <- dt_plot %>%
+  filter(paramcd == "SARA") %>%
+  ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
   geom_point(alpha = 0.7, size = 1.5) +
-  ggsci::scale_color_d3() +
+  ggsci::scale_color_d3(name = "study") +
+  ggsci::scale_fill_d3(name = "study") +
   geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
-  facet_wrap(~ paramcd, scales = "free_x", nrow = 2, ncol = 2) +
-  coord_cartesian(ylim = USS_YLIM) +
-  labs(
-    x = "Clinical Scale Score",
-    y = "Upright Stability Score (USS)",
-    color = "Study"
+  ggpmisc::stat_correlation(
+    aes(label = paste(after_stat(rr.label))),
+    size = 10 / .pt,
+    family = theme_get()$text$family,
+    alpha = NA,
+    data = dt_plot %>% filter(paramcd == "SARA") %>% droplevels()
   ) +
-  .leg('lr')
+  geom_xsidedensity(alpha = 0.7) +
+  # No y-density for SARA (top-left)
+  scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+  coord_cartesian(ylim = USS_YLIM) +
+  labs(x = "SARA", y = "USS", color = "study") +
+  .leg('none') +
+  .theme() +
+  theme(ggside.panel.scale = 0.3)
 
-# Add marginal density plots if requested
-if (add_marginal_densities) {
-  faceted_plot <- faceted_plot %>%
-    ggExtra::ggMarginal(type = 'density', groupFill = TRUE)
+plot_fSARA_clean <- dt_plot %>%
+  filter(paramcd == "fSARA") %>%
+  ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  ggsci::scale_color_d3(name = "study") +
+  ggsci::scale_fill_d3(name = "study") +
+  geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
+  ggpmisc::stat_correlation(
+    aes(label = paste(after_stat(rr.label))),
+    size = 10 / .pt,
+    family = theme_get()$text$family,
+    alpha = NA,
+    data = dt_plot %>% filter(paramcd == "fSARA") %>% droplevels()
+  ) +
+  geom_xsidedensity(alpha = 0.7) +
+  # No y-density for fSARA (bottom-left)
+  scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+  coord_cartesian(ylim = USS_YLIM) +
+  labs(x = "fSARA", y = "USS", color = "study") +
+  .leg('none') +
+  .theme() +
+  theme(ggside.panel.scale = 0.3)
+
+# Create SARA axial plot if included
+if(include_SARA_axial) {
+  plot_SARA_ax_clean <- dt_plot %>%
+    filter(paramcd == "SARA.axial") %>%
+    ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
+    geom_point(alpha = 0.7, size = 1.5) +
+    ggsci::scale_color_d3() +
+    ggsci::scale_fill_d3() +
+    geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
+    ggpmisc::stat_correlation(
+      aes(label = paste(after_stat(rr.label))),
+      size = 10 / .pt,
+      family = theme_get()$text$family,
+      alpha = NA,
+      data = dt_plot %>% filter(paramcd == "SARA.axial") %>% droplevels()
+    ) +
+    geom_xsidedensity(alpha = 0.7) +
+    # No y-density for SARA.axial (top-middle)
+    scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+    coord_cartesian(ylim = USS_YLIM) +
+    labs(x = "SARA.axial", y = "USS", color = "study") +
+    .leg('none') +
+    .theme() +
+    theme(ggside.panel.scale = 0.3)
 }
 
-print(faceted_plot)
+plot_ADL_clean <- dt_plot %>%
+  filter(paramcd == "ADL") %>%
+  ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  ggsci::scale_color_d3(name = "study") +
+  ggsci::scale_fill_d3(name = "study") +
+  geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
+  ggpmisc::stat_correlation(
+    aes(label = paste(after_stat(rr.label))),
+    size = 10 / .pt,
+    family = theme_get()$text$family,
+    alpha = NA,
+    data = dt_plot %>% filter(paramcd == "ADL") %>% droplevels()
+  ) +
+  geom_xsidedensity(alpha = 0.7) +
+  geom_ysidedensity(alpha = 0.7) +
+  scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+  scale_ysidex_continuous(labels = NULL, breaks = NULL) +
+  coord_cartesian(ylim = USS_YLIM) +
+  labs(x = "ADL", y = "USS", color = "study") +
+  .leg('none') +
+  .theme() +
+  theme(ggside.panel.scale = 0.3)
 
-# ==============================================================================
-# NOTES AND INTERPRETATION
-# ==============================================================================
+# Create SARA appendicular plot if included
+if(include_SARA_appendicular) {
+  plot_SARA_ap_clean <- dt_plot %>%
+    filter(paramcd == "SARA.appendicular") %>%
+    ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
+    geom_point(alpha = 0.7, size = 1.5) +
+    ggsci::scale_color_d3() +
+    ggsci::scale_fill_d3() +
+    geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
+    ggpmisc::stat_correlation(
+      aes(label = paste(after_stat(rr.label))),
+      size = 10 / .pt,
+      family = theme_get()$text$family,
+      alpha = NA,
+      data = dt_plot %>% filter(paramcd == "SARA.appendicular") %>% droplevels()
+    ) +
+    geom_xsidedensity(alpha = 0.7) +
+    geom_ysidedensity(alpha = 0.7) +
+    scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+    scale_ysidex_continuous(labels = NULL, breaks = NULL) +
+    coord_cartesian(ylim = USS_YLIM) +
+    labs(x = "SARA.appendicular", y = "USS", color = "study") +
+    .leg('none') +
+    .theme() +
+    theme(ggside.panel.scale = 0.3)
+}
+
+# Create layout based on inclusion settings - 3 cols x 2 rows
+# Top row: SARA, SARA.axial (if included), SARA.appendicular (if included)
+# Bottom row: fSARA, ADL, (empty)
+
+# Create layout based on inclusion settings - 3 cols x 2 rows
+# Top row: SARA, SARA.axial (if included), SARA.appendicular (if included)
+# Bottom row: fSARA, ADL, (empty)
+
+if(include_SARA_axial && include_SARA_appendicular) {
+  # Full layout: all 5 plots
+  design <- "
+ABC
+DE#
+"
+  combined_plot <- plot_SARA_clean + plot_SARA_ax_clean + plot_SARA_ap_clean +
+                   plot_fSARA_clean + plot_ADL_clean +
+                   plot_layout(design = design)
+} else if(include_SARA_axial && !include_SARA_appendicular) {
+  # SARA + SARA.axial only
+  design <- "
+AB#
+CD#
+"
+  combined_plot <- plot_SARA_clean + plot_SARA_ax_clean +
+                   plot_fSARA_clean + plot_ADL_clean +
+                   plot_layout(design = design)
+} else if(!include_SARA_axial && include_SARA_appendicular) {
+  # SARA + SARA.appendicular only
+  design <- "
+A#B
+CD#
+"
+  combined_plot <- plot_SARA_clean + plot_SARA_ap_clean +
+                   plot_fSARA_clean + plot_ADL_clean +
+                   plot_layout(design = design)
+} else {
+  # Only SARA (minimal)
+  design <- "
+A##
+BC#
+"
+  combined_plot <- plot_SARA_clean + plot_fSARA_clean + plot_ADL_clean +
+                   plot_layout(design = design)
+}
+
+# Add legend centered above all plots
+combined_plot_with_legend <- combined_plot +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "top", legend.justification = "center")
+
+# Show combined plot with densities
+print("Combined plot with marginal densities:")
+print(combined_plot_with_legend)
+
+# Assign to 'p' for .sp() function
+p <- combined_plot_with_legend
+
+# Notes and interpretation -----------------------------------------------
 #
 # This analysis examines the correlation between the Upright Stability Score (USS)
-# and three other clinical assessment scales:
+# and other clinical assessment scales:
 # - ADL: Activities of Daily Living scale
 # - SARA: Scale for the Assessment and Rating of Ataxia
 # - fSARA: Functional SARA (abbreviated version)
+# - SARA.axial: SARA axial function subscore
+# - SARA.appendicular: SARA appendicular function subscore
 #
 # Key findings:
 # - Correlations are calculated using baseline visits only
@@ -194,4 +371,7 @@ print(faceted_plot)
 # - Higher USS scores should correlate with higher SARA/fSARA scores (more ataxia)
 # - Higher USS scores should correlate with higher ADL scores (more disability)
 #
-# ==============================================================================
+# -----------------------------------------------------------------------
+
+# for exporting pptx slide
+# .sp( ti = "Figure 2", i = 1, l = 'F')

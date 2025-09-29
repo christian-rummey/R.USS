@@ -6,7 +6,10 @@ rm(list = ls())
 source('.project.settings.R')
 
 dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
+  filter(subtype == 'SCA6') %>% 
   # filter(has.both) %>% 
+  # filter(is.30ol) %>% 
+  # filter(can.stand) %>%
   filter(!is.nonamb) %>%
   droplevels()
 
