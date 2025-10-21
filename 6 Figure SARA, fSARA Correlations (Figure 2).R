@@ -14,6 +14,16 @@
 rm(list = ls())
 source('.project.settings.R')
 
+theme_set(
+  theme_minimal(base_size = 8) %+replace%
+    theme(
+      legend.position  = "top",
+      legend.box      = "horizontal",
+      legend.direction= "horizontal",
+      complete         = TRUE
+    )
+)
+
 library(patchwork)  # for combining plots
 library(ggside)     # for marginal densities
 
@@ -25,6 +35,7 @@ SCALE_LABELS <- c('ADL', 'SARA', 'SARA.axial', 'SARA.appendicular', 'USS', 'fSAR
 # Optional parameters to control which plots to include
 include_SARA_axial <- TRUE          # Include SARA.axial plot
 include_SARA_appendicular <- TRUE   # Include SARA.appendicular plot
+include_ADL <- FALSE                # Exclude ADL for 2x2 layout
 
 # USS plot limits (based on scale range)
 USS_YLIM <- c(0, 36)
@@ -46,8 +57,8 @@ dt_raw <- readRDS('DATA derived/dt.all.visits.rds') %>%
 # Apply scale labels and filter for relevant parameters
 dt_processed <- dt_raw %>%
   mutate(paramcd = factor(paramcd,
-                         levels = CLINICAL_SCALES,
-                         labels = SCALE_LABELS)) %>%
+                          levels = CLINICAL_SCALES,
+                          labels = SCALE_LABELS)) %>%
   filter(!is.na(paramcd))
 
 # DATA QUALITY CHECKS -------------------------------------
@@ -86,16 +97,18 @@ dt_correlation <- dt_wide %>%
   filter(!is.na(aval), !is.na(USS)) %>%
   # Filter scales based on inclusion settings
   filter(paramcd %in% {
-    scales_to_include <- c('SARA', 'fSARA', 'ADL')
+    scales_to_include <- c('SARA', 'fSARA')
     if(include_SARA_axial) scales_to_include <- c(scales_to_include, 'SARA.axial')
     if(include_SARA_appendicular) scales_to_include <- c(scales_to_include, 'SARA.appendicular')
+    if(include_ADL) scales_to_include <- c(scales_to_include, 'ADL')
     scales_to_include
   }) %>%
   mutate(paramcd = factor(paramcd, levels = {
     factor_levels <- c('SARA')
     if(include_SARA_axial) factor_levels <- c(factor_levels, 'SARA.axial')
     if(include_SARA_appendicular) factor_levels <- c(factor_levels, 'SARA.appendicular')
-    factor_levels <- c(factor_levels, 'fSARA', 'ADL')
+    factor_levels <- c(factor_levels, 'fSARA')
+    if(include_ADL) factor_levels <- c(factor_levels, 'ADL')
     factor_levels
   }))
 
@@ -110,11 +123,11 @@ dt_plot <- dt_correlation %>%
 #' @param scale_name Name of the clinical scale to plot
 #' @return ggplot object
 create_single_correlation_plot <- function(data, scale_name) {
-
+  
   # Filter data for the specific scale
   plot_data <- data %>%
     filter(paramcd == scale_name)
-
+  
   # Create base plot
   p <- plot_data %>%
     ggplot(aes(x = aval, y = USS, color = study)) +
@@ -142,7 +155,7 @@ create_single_correlation_plot <- function(data, scale_name) {
     # Apply custom theme (assuming .leg() is defined in project settings)
     .leg('lr')+
     .theme()
-
+  
   return(p)
 }
 
@@ -294,62 +307,51 @@ if(include_SARA_appendicular) {
     theme(ggside.panel.scale = 0.3)
 }
 
-# Create layout based on inclusion settings - 3 cols x 2 rows
-# Top row: SARA, SARA.axial (if included), SARA.appendicular (if included)
-# Bottom row: fSARA, ADL, (empty)
+# Create 1x3 layout: SARA, SARA.axial, SARA.appendicular with densities
+make_plot <- function(data, param_name, x_label, panel_label, add_y_density = FALSE) {
+  p <- data %>%
+    filter(paramcd == param_name) %>%
+    ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
+    geom_point(alpha = 0.7, size = 1.5) +
+    ggsci::scale_color_d3(name = "study") +
+    ggsci::scale_fill_d3(name = "study") +
+    geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
+    ggpmisc::stat_correlation(
+      aes(label = paste(after_stat(rr.label))),
+      size = 10 / .pt,
+      family = theme_get()$text$family,
+      alpha = NA,
+      data = data %>% filter(paramcd == param_name) %>% droplevels()
+    ) +
+    geom_xsidedensity(alpha = 0.7) +
+    scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+    coord_cartesian(ylim = USS_YLIM) +
+    labs(x = x_label, y = if(panel_label == "A") "USS" else NULL) +
+    annotate("text", x = -Inf, y = Inf, label = panel_label, hjust = -0.5, vjust = -0.5,
+             size = 12, fontface = "bold", family = "Tenorite") +
+    .leg('none') +
+    .theme() +
+    theme(ggside.panel.scale = 0.3)
 
-# Create layout based on inclusion settings - 3 cols x 2 rows
-# Top row: SARA, SARA.axial (if included), SARA.appendicular (if included)
-# Bottom row: fSARA, ADL, (empty)
+  if (add_y_density) {
+    p <- p + geom_ysidedensity(alpha = 0.7) +
+      scale_ysidex_continuous(labels = NULL, breaks = NULL)
+  }
 
-if(include_SARA_axial && include_SARA_appendicular) {
-  # Full layout: all 5 plots
-  design <- "
-ABC
-DE#
-"
-  combined_plot <- plot_SARA_clean + plot_SARA_ax_clean + plot_SARA_ap_clean +
-                   plot_fSARA_clean + plot_ADL_clean +
-                   plot_layout(design = design)
-} else if(include_SARA_axial && !include_SARA_appendicular) {
-  # SARA + SARA.axial only
-  design <- "
-AB#
-CD#
-"
-  combined_plot <- plot_SARA_clean + plot_SARA_ax_clean +
-                   plot_fSARA_clean + plot_ADL_clean +
-                   plot_layout(design = design)
-} else if(!include_SARA_axial && include_SARA_appendicular) {
-  # SARA + SARA.appendicular only
-  design <- "
-A#B
-CD#
-"
-  combined_plot <- plot_SARA_clean + plot_SARA_ap_clean +
-                   plot_fSARA_clean + plot_ADL_clean +
-                   plot_layout(design = design)
-} else {
-  # Only SARA (minimal)
-  design <- "
-A##
-BC#
-"
-  combined_plot <- plot_SARA_clean + plot_fSARA_clean + plot_ADL_clean +
-                   plot_layout(design = design)
+  return(p)
 }
 
-# Add legend centered above all plots
-combined_plot_with_legend <- combined_plot +
-  plot_layout(guides = "collect") &
-  theme(legend.position = "top", legend.justification = "center")
+p1 <- make_plot(dt_plot, "SARA", "SARA", "A")
+p2 <- make_plot(dt_plot, "SARA.axial", "SARA.axial", "B")
+p3 <- make_plot(dt_plot, "SARA.appendicular", "SARA.appendicular", "C", add_y_density = TRUE)
 
-# Show combined plot with densities
-print("Combined plot with marginal densities:")
-print(combined_plot_with_legend)
+combined_plot <- p1 + p2 + p3 +
+  plot_layout(ncol = 3, guides = "collect") +
+  plot_annotation(theme = theme(legend.position = "top", legend.justification = "center"))
 
-# Assign to 'p' for .sp() function
-p <- combined_plot_with_legend
+print(combined_plot)
+
+p <- combined_plot
 
 # Notes and interpretation -----------------------------------------------
 #
@@ -373,5 +375,39 @@ p <- combined_plot_with_legend
 #
 # -----------------------------------------------------------------------
 
-# for exporting pptx slide
-# .sp( ti = "Figure 2", i = 1, l = 'F')
+# Export to PowerPoint
+library(officer)
+
+.ppt.template.file <- "C:\\Users\\ChristianRummey\\OneDrive - CDS\\Projects/_templates/CR.template.pptx"
+
+# fixes minus signs (most often)
+.fix_plot_minuses <- function(p) {
+  p + labs(
+    title    = gsub("-", "\u2212", p$labels$title),
+    subtitle = gsub("-", "\u2212", p$labels$subtitle),
+    caption  = gsub("-", "\u2212", p$labels$caption),
+    x        = gsub("-", "\u2212", p$labels$x),
+    y        = gsub("-", "\u2212", p$labels$y)
+  )
+}
+
+pp <- .fix_plot_minuses(p)
+target_file <- "6 Figure SARA, fSARA Correlations (Figure 2).pptx"
+
+ppt <- read_pptx(.ppt.template.file) %>%
+  add_slide(layout = "1", master = "CR") %>%
+  ph_with(
+    dml(print(pp, newpage = FALSE)),
+    location = ph_location_type(type = "body", type_idx = 2)
+  ) %>%
+  ph_with(
+    "Figure 2",
+    location = ph_location_type(type = "title")
+  ) %>%
+  set_notes(
+    value = paste("Created at", format(Sys.time(), "%Y-%m-%d %H-%M-%S")),
+    location = notes_location_type("body")
+  ) %>%
+  print(target = target_file)
+
+print(paste("PowerPoint saved as:", target_file))

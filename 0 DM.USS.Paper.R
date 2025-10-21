@@ -90,21 +90,22 @@ dt.FA <- dt. %>%
   filter(!is.na(adt)) %>%
   # Join demographic data
   left_join(
-    .dd('demo') %>%
-      select(study, sjid, dob, aoo, sev.o) %>%
+    .dd('demo.l') %>%
+      select(study, site, sjid, dob, aoo, sev.o) %>%
       mutate(subtype = as.character(sev.o)),
     by = c("study", "sjid")
   ) %>%
-  # Calculate age and disease duration
+# Calculate age and disease duration
   mutate(
     age = as.numeric(adt - dob) / 365.25,  # Age in years
     dur = age - aoo                        # Disease duration
   ) %>%
   # Calculate time from first visit per subject
-  group_by(sjid) %>%
+  filter(!is.na(age)) %>% 
+  group_by(study, sjid) %>%
   mutate(time. = age - min(age, na.rm = TRUE)) %>%
   ungroup() %>%
-  select(study, sjid, subtype, avisitn, time., age, dur, paramcd, aval)
+  select(study, site, sjid, subtype, avisitn, time., age, dur, paramcd, aval)
 
 # Process CRCSCA (Spinocerebellar Ataxia) data
 dt.SCA <- dt. %>%
@@ -114,7 +115,7 @@ dt.SCA <- dt. %>%
   left_join(
     .dd('demo.sca') %>%
       filter(study == 'CRCSCA') %>%
-      select(study, sjid, sca, aoo) %>%
+      select(study, site, sjid, sca, aoo) %>%
       left_join(
         .dd('visit.dates.CRCSCA') %>%
           group_by(sjid) %>%
@@ -123,7 +124,7 @@ dt.SCA <- dt. %>%
           select(study, sjid, adt, age_bl),
         by = c("study", "sjid")
       ) %>%
-      select(study, sjid, adt_bl = adt, age_bl, aoo, sca) %>%
+      select(study, site,, sjid, adt_bl = adt, age_bl, aoo, sca) %>%
       mutate(subtype = as.character(sca)),
     by = c("study", "sjid")
   ) %>%
@@ -136,7 +137,7 @@ dt.SCA <- dt. %>%
     dur   = age - aoo                                           # Disease duration
   ) %>%
   ungroup() %>%
-  select(study, sjid, subtype, avisitn, time., age, dur, paramcd, aval)
+  select(study, site, sjid, subtype, avisitn, time., age, dur, paramcd, aval)
 
 # COMBINE AND CLEAN DATA =====================================================
 

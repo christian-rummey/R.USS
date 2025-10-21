@@ -149,11 +149,11 @@ make_tab2_for <- function(dt.filter, suffix) {
     t0.NRitems %>% mutate(across(everything(), as.character), Row = "No. of items") %>% select(Row, all_of(scale_order)),
     header("Corrected item–total correlations"),
     t1.it.corr %>% mutate(Row = stringr::str_to_sentence(stat)) %>% select(Row, all_of(scale_order)),
-    header("Subscale characteristics"),
+    header("Scale characteristics"),
     t2.m.sd.skew %>% mutate(Row = recode(stat, mean_sd="Mean score (SD)", observed="Observed score (max)", skew="Skewness")) %>% select(Row, all_of(scale_order)),
     t3.flcl %>% rename(Row = stat) %>% select(Row, all_of(scale_order)),
     t4.alpha %>% mutate(Row = "Cronbach α") %>% select(Row, all_of(scale_order)),
-    header("Subscale intercorrelations"),
+    header("Scale intercorrelations"),
     bind_rows(header(""), t5.inter %>% select(Row, all_of(scale_order))),
     header("Correlation with other parameters"),
     t6.cor.ads %>% select(Row, all_of(scale_order))
@@ -218,4 +218,46 @@ tab2.combined <- bind_cols(tab2.SCA, tab2.FRDA) %>%
   filter(Property != '') 
 tab2.combined %>%
   .p
-  
+
+# -----------------------------------------------------------------------
+# Printing and docx export (from script 2A)
+# -----------------------------------------------------------------------
+
+library(flextable)
+library(officer)
+
+# Create flextable scaled to full page width
+colnames(tab2.combined) <- gsub("\\.", "\n", colnames(tab2.combined))
+
+# Get the original data
+df <- tab2.combined
+
+# Extract column names and split by \n
+col_names <- colnames(df)
+header_df <- tibble(
+  col_keys = col_names,
+  level1 = if_else(str_detect(col_names, "\n"), str_extract(col_names, "^[^\n]+"), ""),  # before \n
+  level2 = if_else(str_detect(col_names, "\n"), str_extract(col_names, "[^\n]+$"), col_names)  # after \n
+)
+
+ft <- flextable(df) %>%
+  set_header_df(mapping = header_df, key = "col_keys") %>%
+  theme_vanilla() %>%
+  fontsize(size = 8, part = "all") %>%
+  align(align = "center", part = "all") %>%
+  align(j = 1, align = "left", part = "all") %>%
+  bold(i = ~ grepl("No\\. of items|Corrected item|Scale characteristics|Scale intercorrelations|Correlation with other parameters", Property),
+       part = "body") %>%
+  set_table_properties(layout = "autofit", width = 1) %>%
+  merge_h(part = "header") %>%      # Merge same top-level headers across columns
+  merge_v(j = 1, part = "body")     # Optional: merge identical cells in first column
+
+ft %<>%
+  set_table_properties(layout = "autofit", width = 1)  # make table 100% page width
+
+# Export to Word in portrait orientation
+read_docx() %>%
+  body_add_flextable(ft) %>%
+  print(target = "5 Psychometric Properties (Table 1).docx")
+
+print("Docx file saved as: 5 Psychometric Properties (Table 1).docx")
