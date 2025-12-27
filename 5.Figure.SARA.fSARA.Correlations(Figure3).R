@@ -45,7 +45,7 @@ USS_YLIM <- c(0, 36)
 # Load preprocessed clinical data
 dt_raw <- readRDS('DATA derived/dt.all.visits.rds') %>%
   # Exclude non-ambulatory patients from correlation analysis
-  filter(!is.nonamb) %>%
+  # filter(!is.nonamb) %>%  # Now filtered in 0.DM.USS.Paper.R
   # Create ambulation status categories
   mutate(status = case_when(
     is.preataxic ~ 'preataxic',
@@ -86,7 +86,7 @@ dt_wide <- dt_processed %>%
 # Prepare correlation analysis dataset
 # Focus on baseline visits and ambulatory patients
 dt_correlation <- dt_wide %>%
-  filter(!is.nonamb) %>%
+  # filter(!is.nonamb) %>%  # Now filtered in 0.DM.USS.Paper.R
   # Convert back to long format for the scales of interest
   gather(paramcd, aval, ADL, SARA, SARA.axial, SARA.appendicular, fSARA) %>%
   # Use baseline visits only
@@ -205,7 +205,7 @@ plot_SARA_clean <- dt_plot %>%
   labs(x = "SARA", y = "USS", color = "study") +
   .leg('none') +
   .theme() +
-  theme(ggside.panel.scale = 0.3)
+  theme(ggside.panel.scale = 0.3, panel.grid.minor = element_blank())
 
 plot_fSARA_clean <- dt_plot %>%
   filter(paramcd == "fSARA") %>%
@@ -228,7 +228,7 @@ plot_fSARA_clean <- dt_plot %>%
   labs(x = "fSARA", y = "USS", color = "study") +
   .leg('none') +
   .theme() +
-  theme(ggside.panel.scale = 0.3)
+  theme(ggside.panel.scale = 0.3, panel.grid.minor = element_blank())
 
 # Create SARA axial plot if included
 if(include_SARA_axial) {
@@ -253,7 +253,7 @@ if(include_SARA_axial) {
     labs(x = "SARA.axial", y = "USS", color = "study") +
     .leg('none') +
     .theme() +
-    theme(ggside.panel.scale = 0.3)
+    theme(ggside.panel.scale = 0.3, panel.grid.minor = element_blank())
 }
 
 plot_ADL_clean <- dt_plot %>%
@@ -278,7 +278,7 @@ plot_ADL_clean <- dt_plot %>%
   labs(x = "ADL", y = "USS", color = "study") +
   .leg('none') +
   .theme() +
-  theme(ggside.panel.scale = 0.3)
+  theme(ggside.panel.scale = 0.3, panel.grid.minor = element_blank())
 
 # Create SARA appendicular plot if included
 if(include_SARA_appendicular) {
@@ -304,50 +304,57 @@ if(include_SARA_appendicular) {
     labs(x = "SARA.appendicular", y = "USS", color = "study") +
     .leg('none') +
     .theme() +
-    theme(ggside.panel.scale = 0.3)
+    theme(ggside.panel.scale = 0.3, panel.grid.minor = element_blank())
 }
 
 # Create 1x3 layout: SARA, SARA.axial, SARA.appendicular with densities
-make_plot <- function(data, param_name, x_label, panel_label, add_y_density = FALSE) {
-  p <- data %>%
-    filter(paramcd == param_name) %>%
-    ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
-    geom_point(alpha = 0.7, size = 1.5) +
-    ggsci::scale_color_d3(name = "study") +
-    ggsci::scale_fill_d3(name = "study") +
-    geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
-    ggpmisc::stat_correlation(
-      aes(label = paste(after_stat(rr.label))),
-      size = 10 / .pt,
-      family = theme_get()$text$family,
-      alpha = NA,
-      data = data %>% filter(paramcd == param_name) %>% droplevels()
-    ) +
-    geom_xsidedensity(alpha = 0.7) +
-    scale_xsidey_continuous(labels = NULL, breaks = NULL) +
-    coord_cartesian(ylim = USS_YLIM) +
-    labs(x = x_label, y = if(panel_label == "A") "USS" else NULL) +
-    annotate("text", x = -Inf, y = Inf, label = panel_label, hjust = -0.5, vjust = -0.5,
-             size = 12, fontface = "bold", family = "Tenorite") +
-    .leg('none') +
-    .theme() +
-    theme(ggside.panel.scale = 0.3)
+# REFACTORED APPROACH:
+# Step 1: Create faceted plot with top ggside densities (all 3 panels in one go)
+# Step 2: Create separate right-side USS density plot
+# Step 3: Combine with patchwork
 
-  if (add_y_density) {
-    p <- p + geom_ysidedensity(alpha = 0.7) +
-      scale_ysidex_continuous(labels = NULL, breaks = NULL)
-  }
+# Prepare data for faceted plot (3 scales)
+plot_data_faceted <- dt_plot %>%
+  filter(paramcd %in% c("SARA", "SARA.axial", "SARA.appendicular")) %>%
+  mutate(paramcd = factor(paramcd,
+                          levels = c("SARA", "SARA.axial", "SARA.appendicular")))
 
-  return(p)
-}
+# Step 1: Create faceted plot with top ggside densities AND right y-density
+faceted_plot <- plot_data_faceted %>%
+  ggplot(aes(x = aval, y = USS, color = study, fill = study)) +
+  geom_point(alpha = 0.7, size = 1.5) +
+  ggsci::scale_color_d3(name = "study") +
+  ggsci::scale_fill_d3(name = "study") +
+  geom_smooth(method = lm, se = FALSE, alpha = 0.8) +
+  ggpmisc::stat_correlation(
+    aes(label = paste(after_stat(rr.label))),
+    size = 8 / .pt,  # Slightly bigger font size
+    label.x = 0.95,  # Position more to the left from right edge
+    label.y = 0.15,  # Position higher from bottom
+    family = theme_get()$text$family,
+    alpha = NA
+  ) +
+  geom_xsidedensity(alpha = 0.7) +
+  geom_ysidedensity(alpha = 0.7) +
+  scale_xsidey_continuous(labels = NULL, breaks = NULL) +
+  scale_ysidex_continuous(labels = NULL, breaks = NULL) +
+  coord_cartesian(ylim = USS_YLIM) +
+  facet_wrap(~paramcd, nrow = 1, scales = "free_x") +
+  labs(y = "USS", x = NULL) +
+  .leg('none') +
+  .theme() +
+  theme(ggside.panel.scale = 0.3,
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold", size = 10))
 
-p1 <- make_plot(dt_plot, "SARA", "SARA", "A")
-p2 <- make_plot(dt_plot, "SARA.axial", "SARA.axial", "B")
-p3 <- make_plot(dt_plot, "SARA.appendicular", "SARA.appendicular", "C", add_y_density = TRUE)
-
-combined_plot <- p1 + p2 + p3 +
-  plot_layout(ncol = 3, guides = "collect") +
-  plot_annotation(theme = theme(legend.position = "top", legend.justification = "center"))
+# Step 2: Combine with patchwork and collect guides
+combined_plot <- faceted_plot +
+  plot_layout(guides = "collect") +
+  plot_annotation(
+    theme = theme(legend.position = "top", legend.justification = "center"),
+    tag_levels = 'A'
+  ) &
+  theme(plot.tag = element_text(size = 12, face = "bold", family = "Tenorite"))
 
 print(combined_plot)
 
@@ -392,7 +399,7 @@ library(officer)
 }
 
 pp <- .fix_plot_minuses(p)
-target_file <- "6 Figure SARA, fSARA Correlations (Figure 2).pptx"
+target_file <- "5.Figure.SARA.fSARA.Correlations(Figure3).pptx"
 
 ppt <- read_pptx(.ppt.template.file) %>%
   add_slide(layout = "1", master = "CR") %>%
@@ -401,7 +408,7 @@ ppt <- read_pptx(.ppt.template.file) %>%
     location = ph_location_type(type = "body", type_idx = 2)
   ) %>%
   ph_with(
-    "Figure 2",
+    "Figure 3",
     location = ph_location_type(type = "title")
   ) %>%
   set_notes(

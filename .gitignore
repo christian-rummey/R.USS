@@ -6,4 +6,6 @@
 outputs.*
 .*
 *.pptx
-DATA derived/*.rds
+*.docx
+DATA derived/
+.legacy code/

@@ -6,12 +6,12 @@ library(ggcorrplot)
 
 source('.project.settings.R')
 
-dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
+dt. <- readRDS('DATA derived/dt.all.visits.rds') %>%
   # filter( !is.na(subtype), !subtype %in% c("SCA10","SCA7","SCA8")) %>%
-  filter(!is.nonamb) %>%
-  filter(sjid !='LA125') %>% 
+  # filter(!is.nonamb) %>%  # Now filtered in 0.DM.USS.Paper.R
+  filter(sjid !='LA125') %>%
   # filter(!is.preataxic) %>%
-  
+
   droplevels()
 
 dt.wide <- dt. %>% 
@@ -271,7 +271,7 @@ library(officer)
   )
 }
 
-target_file <- "7 Cross Correlation Boxes (Figure 4, Supp Fig 2).pptx"
+target_file <- "6.Cross.Correlation.Boxes(Figure4).pptx"
 
 ppt <- read_pptx(.ppt.template.file)
 

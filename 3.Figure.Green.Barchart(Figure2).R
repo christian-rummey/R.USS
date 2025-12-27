@@ -15,12 +15,12 @@ theme_set(
     )
 )
 
-dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
-  # filter(subtype == 'RFC1') %>% 
-  # filter(has.both) %>% 
-  # filter(is.30ol) %>% 
+dt. <- readRDS('DATA derived/dt.all.visits.rds') %>%
+  # filter(subtype == 'RFC1') %>%
+  # filter(has.both) %>%
+  # filter(is.30ol) %>%
   # filter(can.stand) %>%
-  filter(!is.nonamb) %>%
+  # filter(!is.nonamb) %>%  # Now filtered in 0.DM.USS.Paper.R
   droplevels()
 
 stance.labs. <- c(
@@ -37,7 +37,7 @@ stance.labs.all <- c(
 params.    <- c('fane7', .l.FARS.E[c(2:7)])
 params.all <- c('fane1','fane6','fane7', .l.FARS.E[c(2:7)])
 
-# ===== Figure 1: Main figure (subset of items) =====
+# ===== Figure 2: Main figure (subset of items) =====
 
 dt.main <- dt. %>%
   mutate( paramcd = factor(paramcd,
@@ -113,7 +113,7 @@ p1 <- dt.tmp %>%
   labs(
     fill = "Result",
     x = "Stance Position",
-    y = NULL
+    y = "Number of Participants"
   )+
   .theme()
 
@@ -200,7 +200,7 @@ p2 <- dt.tmp.all %>%
   labs(
     fill = "Result",
     x = "Stance Position",
-    y = NULL
+    y = "Number of Participants"
   )+
   .theme()
 
@@ -223,9 +223,9 @@ library(officer)
   )
 }
 
-# Export Figure 1
+# Export Figure 2
 pp1 <- .fix_plot_minuses(p1)
-target_file1 <- "4 Figure Green Barchart (Figure 1).pptx"
+target_file1 <- "3.Figure.Green.Barchart(Figure2).pptx"
 
 ppt1 <- read_pptx(.ppt.template.file) %>%
   add_slide(layout = "F", master = "CR") %>%
@@ -234,7 +234,7 @@ ppt1 <- read_pptx(.ppt.template.file) %>%
     location = ph_location_type(type = "body", type_idx = 1)
   ) %>%
   ph_with(
-    "Figure 1",
+    "Figure 2",
     location = ph_location_type(type = "title")
   ) %>%
   set_notes(
@@ -247,7 +247,7 @@ print(paste("PowerPoint saved as:", target_file1))
 
 # Export Supplemental Figure 1
 pp2 <- .fix_plot_minuses(p2)
-target_file2 <- "4 Figure Green Barchart (all items, Supp Fig. 1).pptx"
+target_file2 <- "3.Figure.Green.Barchart(SuppFig1).pptx"
 
 ppt2 <- read_pptx(.ppt.template.file) %>%
   add_slide(layout = "F", master = "CR") %>%

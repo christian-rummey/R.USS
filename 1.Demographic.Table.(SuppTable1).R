@@ -5,7 +5,7 @@ rm(list = ls())
 dt. <- readRDS("DATA derived/dt.all.visits.rds") %>%
   # filter( !is.preataxic  ) %>%
   # filter(  has.both      ) %>%
-  filter( !is.nonamb       ) %>%
+  # filter( !is.nonamb       ) %>%  # Now filtered in 0.DM.USS.Paper.R
   # filter( !is.na(subtype), !subtype %in% c("SCA10","SCA7","SCA8")) %>%
   filter(paramcd %in% c('SARA')) %>%
   droplevels()
@@ -96,6 +96,6 @@ print("Demographic table created successfully")
 # Export to Word
 read_docx() %>%
   body_add_flextable(demo_flextable) %>%
-  print(target = "2 Demographic Table (Supp Taple 1).docx")
+  print(target = "1.Demographic.Table.(SuppTable1).docx")
 
-print("Docx file saved as: 2 Demographic Table (Supp Taple 1) ")
+print("Docx file saved as: 1.Demographic.Table.(SuppTable1).docx")

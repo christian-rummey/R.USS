@@ -72,7 +72,7 @@ dt. <- bind_rows(
   .dd('sara') %>% filter(study %in% target_studies),  # SARA data
   .dd('adl')  %>% filter(study %in% target_studies)   # ADL data
 ) %>%
-  select(-age, -time.)  # Remove columns that will be recalculated
+  select(-tm.)  # Remove columns that will be recalculated
 
 # Apply temporal filters and data selection
 dt. <- dt. %>%
@@ -170,14 +170,18 @@ duplicate_baseline <- dt. %>%
   ungroup()
 
 # HARDCODED FIX: Remove specific problematic record
-# TODO: Investigate why subject JH115 visit 1 is problematic
+# JH115 has no data on avisitn 1
+# 1180 makes trouble when going to wide data. 
 dt. <- dt. %>%
-  filter(!(sjid == 'JH115' & avisitn == 1))
+  filter(!(sjid == 'JH115' & avisitn == 1)) %>%
+  filter(!(sjid == 1180 ) ) 
 
 # ADD FUNCTIONAL DISABILITY STAGING ==========================================
 
 # Convert from long to wide format to enable cross-scale calculations
 dt. <- dt. %>%
+  # filter(paramcd == 'FARS.E') %>% 
+  # group_by(study, sjid, paramcd, age) %>% filter(n()>1)
   spread(paramcd, aval) %>%
   ungroup() %>%
   # Add functional disability staging (FDS) data
@@ -242,8 +246,20 @@ dt. <- dt. %>%
 
 # RESTRICT TO BASELINE VISITS ONLY =========================================
 
+dt. %>% 
+  select( study, sjid, avisitx ) %>% 
+  unique %>% 
+  select( study, avisitx ) %>% 
+  .tab
+  
 dt. <- dt. %>%
   filter(avisitx == 0)
+
+# FILTER TO AMBULATORY PATIENTS ONLY =======================================
+
+dt. <- dt. %>%
+  filter(!is.nonamb)
+
 
 # Report final sample size
 final_n_subjects <- length(unique(dt.$sjid))
