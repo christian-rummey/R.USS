@@ -2,10 +2,10 @@
 rm(list = ls())
 source('.project.settings.R')
 
-dt. <- readRDS('DATA derived/dt.all.visits.rds') %>% 
-  # filter(!is.preataxic) %>% 
-  filter(!is.nonamb) %>%
-  mutate( status = ifelse(is.preataxic, 'preataxic', ifelse(is.nonamb, 'non-ambualtory', 'ambulatory' ))) %>% 
+dt. <- readRDS('DATA derived/dt.all.visits.rds') %>%
+  # filter(!is.preataxic) %>%
+  # filter(!is.nonamb) %>%  # Now filtered in 0.DM.USS.Paper.R
+  mutate( status = ifelse(is.preataxic, 'preataxic', ifelse(is.nonamb, 'non-ambualtory', 'ambulatory' ))) %>%
   droplevels()
 
 params. <- c('FARS.E','SARA','fSARA','ADL')
@@ -268,7 +268,7 @@ p_rescaled <- ggplot(dt.cum2, aes(x = aval, y = pct_cum, color = subtype)) +
 
 pp_rescaled <- .fix_plot_minuses(p_rescaled)
 
-target_file <- "8 Genotype Specific Ceiling Effects.pptx"
+target_file <- "7.Genotype.Specific.Ceiling.Effects(Figure3).pptx"
 
 ppt <- read_pptx(.ppt.template.file) %>%
   add_slide(layout = "TTE", master = "CR") %>%
